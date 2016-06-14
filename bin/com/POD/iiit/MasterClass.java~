@@ -1,0 +1,234 @@
+package com.POD.iiit;
+
+import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryMXBean;
+import java.util.HashMap;
+import java.util.Map;
+
+public class MasterClass {
+	
+	public static long startTime;
+	public static long endTime;
+	public static long MAX_MEMORY;
+	public static HashMap<String,String> attr_type;
+	public static HashMap<String,Integer> attr_pos;
+	public static HashMap<String,Integer> gg_map;
+
+	public static void main(String[] args) {
+		// TODO Auto-generated method stub
+
+		/**Declare your variables here**/
+		startTime = System.currentTimeMillis();
+		
+		/**attribute type hash map **/		
+		attr_type = new HashMap<String,String>();
+		
+		/**attribute position hash map **/
+		attr_pos = new HashMap<String,Integer>();
+		
+		/**only hashmap**/
+		gg_map = new HashMap<String,Integer>();
+		
+		/**record length**/
+		long rec_length=1;
+		
+		/**number of records**/
+		long no_of_records_in_main_memory=1;
+		
+		/**total number of records in a given input file **/
+		long total_records=1;
+		
+		/**Sorted lists**/
+		double no_of_sorted_lists=1;
+		
+		/**Variable declarations end here**/
+		
+		System.out.println("POD welcomes you!");
+		
+		System.out.println("Metadata File ==> " + args[0]);
+		System.out.println("Input File ==> " + args[1]);
+		System.out.println("Output File ==> " + args[2]);
+		
+		
+		String line;
+		/**reading metadata file**/
+		FileReaderClass read_obj = new FileReaderClass(args[0]);
+		read_obj.openFile();
+		line = read_obj.readFile();
+		int counter=0;
+		while(line!=null)
+		{
+			String[] array = line.split(",");
+			attr_type.put(array[0], array[1]);
+			attr_pos.put(array[0], counter);
+			counter++;
+			line = read_obj.readFile();
+		}
+		read_obj.closeFile();
+		
+		System.out.println("Attribute type hashmap "+ attr_type.toString());
+		System.out.println("Attribute position hashmap "+ attr_pos.toString());
+
+		
+		getMaxMemory();
+		
+		rec_length=recordLength();
+		
+		no_of_records_in_main_memory = getNoOfSortedRecords(rec_length);
+		
+		total_records = noOfRecordsInGivenInput(args[1]);//this is the input file
+		no_of_sorted_lists = Math.ceil(noOfSortedSublists(total_records,no_of_records_in_main_memory));
+
+		System.out.println("Record length is = " + rec_length);
+		System.out.println("No of records in main memory = "+ no_of_records_in_main_memory);
+		System.out.println("Total records are = "+ total_records);
+		System.out.println("Number of sorted sub lists are = "+no_of_sorted_lists);
+
+		boolean union= unionPossible(no_of_sorted_lists, rec_length);
+
+		startTime = System.currentTimeMillis();
+	
+		if(union)
+		{
+			System.out.println("Union is possible");
+			read_obj = new FileReaderClass(args[1]);
+			read_obj.openFile();
+			line = read_obj.readFile();
+			counter=0;
+			while(line!=null)
+			{
+				if(!gg_map.containsKey(line))
+				{
+					gg_map.put(line, 1);
+				}
+				else
+				{
+					Integer val = gg_map.get(line);
+					val++;
+					gg_map.put(line, val);
+				}
+				counter++;
+				line = read_obj.readFile();
+			}
+			read_obj.closeFile();
+			
+		}
+		
+		for (Map.Entry<String,Integer> entry : gg_map.entrySet()) {
+			  String key = entry.getKey();
+			  Integer value = entry.getValue();
+			  // do stuff
+			  System.out.println(value);
+			}
+		
+		endTime = System.currentTimeMillis();
+		
+	}
+	
+	public static boolean unionPossible(double noOfSortedSublists,long recordLength)
+	{
+		double result = noOfSortedSublists*recordLength + recordLength; //one for the output buffer
+		
+		if(result>= MAX_MEMORY)
+			return false;
+		else
+			return true;
+	}
+
+	public static void getMaxMemory()
+	{
+		MemoryMXBean memoryBean = ManagementFactory.getMemoryMXBean();
+		MAX_MEMORY = memoryBean.getHeapMemoryUsage().getMax();
+//		5 MB is subtracted so that all local variables, references can be supported
+		MAX_MEMORY = (MAX_MEMORY/2) - (5242880);
+	}
+	
+	/**Method used to get the length of records **/
+	public static long recordLength()
+	{	
+		long record_length=0;
+		
+		for(String key: attr_type.keySet())
+		{
+			String dataType = attr_type.get(key);
+			if(dataType.contains("int")||dataType.contains("INT"))
+			{
+				record_length+=8;//specified 6 digits in given example (keep 8)
+			}
+			
+			if(dataType.contains("date")||dataType.contains("DATE"))
+			{
+				record_length+=12;//10 but keep 2 extra
+			}
+			
+			if(dataType.contains("char") || dataType.contains("CHAR"))
+			{
+				String charLength = dataType.substring(dataType.indexOf("(")+1,dataType.indexOf(")"));
+				Integer charLength_in_Integer = Integer.parseInt(charLength);
+				System.out.println("The size of char is " + charLength_in_Integer);
+				charLength_in_Integer = charLength_in_Integer +2; //for NULL character
+				record_length+= charLength_in_Integer;
+			}
+			
+		}
+		
+		/**since each character in java is encoded by UTF 8 it takes 2 bytes 
+		 * Also string object holds 24 bytes for char array, offset and count
+		 * 
+		 * Total record size = 24bytes(fixed) + record_length*2;
+		 * 
+		 * **/
+		
+		record_length = record_length*2; //record_length = 24 + record_length*2;  
+		
+		return record_length;
+	}
+	
+	
+	/**Number of records that can be sorted in main memory **/
+	public static long getNoOfSortedRecords(long rec_length)	
+	{
+		if(rec_length==0)
+		{
+			System.out.println("check rec length again, it is 0 here");
+			return 1;
+		}
+		return MAX_MEMORY/rec_length;
+	}
+	
+	/**Number of records present in the given input file **/
+	public static long noOfRecordsInGivenInput(String filename)
+	{
+		long counter=0;
+		
+		FileReaderClass myReader = new FileReaderClass(filename);
+		myReader.openFile();
+		try
+		{
+			String line = myReader.buff_reader.readLine();
+			
+			while(line!=null)
+			{
+				counter++;
+				line =  myReader.buff_reader.readLine();
+			}
+		}
+		catch(IOException e)
+		{
+			System.out.println("IO excpetio in method noOfRecors class: main ");
+		}
+		
+		myReader.closeFile();
+		
+		return counter;
+						
+	}
+	
+	/** No of sorted sublists that can be created **/
+	public static double noOfSortedSublists(double totalrecords,double rec_main_memory)
+	{
+		return totalrecords/rec_main_memory;
+	}
+	
+}
